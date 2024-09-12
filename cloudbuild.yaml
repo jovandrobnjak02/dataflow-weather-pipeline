@@ -1,0 +1,66 @@
+steps:
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        gsutil cp gs://$_BUCKET_NAME/pipeline-metadata/metadata.json .
+  
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - 'europe-docker.pkg.dev/$PROJECT_ID/test-repo/dataflow-pipeline:latest'
+      - '.'
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - 'europe-docker.pkg.dev/$PROJECT_ID/test-repo/dataflow-pipeline:latest'
+
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        # List the Dataflow jobs by name and drain them
+        jobs=$(gcloud dataflow jobs list --filter='state=Running AND name:test-weather-pipeline-*' --format='value(id)')
+        for job in $jobs; do
+          gcloud dataflow jobs drain $job --region=europe-west1
+        done
+
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        gcloud dataflow flex-template build gs://$_BUCKET_NAME/templates/test-weather-pipeline.json \
+        --image "europe-docker.pkg.dev/$PROJECT_ID/test-repo/dataflow-pipeline:latest" \
+        --sdk-language "PYTHON" \
+        --metadata-file "./metadata.json"
+
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        gcloud dataflow flex-template run "test-weather-pipeline-$(date +%Y%m%d-%H%M%S)" \
+        --template-file-gcs-location=gs://$_BUCKET_NAME/templates/test-weather-pipeline.json \
+        --region=europe-west1 \
+        --parameters bigquery_table=$_BIGQUERY_TABLE,bigquery_dataset=$_BIGQUERY_DATASET,input_subscription=$_INPUT_SUBSCRIPTION \
+        --staging-location="gs://$_BUCKET_NAME/dataflow-staging" \
+        --temp-location="gs://$_BUCKET_NAME/dataflow-temp" \
+        --enable-streaming-engine
+
+
+substitutions:
+  _BUCKET_NAME: ''
+  _BIGQUERY_TABLE: ''
+  _BIGQUERY_DATASET: ''
+  _INPUT_SUBSCRIPTION: ''
+
+images:
+  - 'europe-docker.pkg.dev/$PROJECT_ID/test-repo/dataflow-pipeline:latest'
+
+options:
+  logging: CLOUD_LOGGING_ONLY

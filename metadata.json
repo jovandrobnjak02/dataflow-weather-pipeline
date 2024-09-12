@@ -1,0 +1,22 @@
+{
+    "name": "test-weather-pipeline",
+    "description": "A Dataflow Flex Template for processing weather data from Pub/Sub and GCS to BigQuery",
+    "streaming": true,
+    "parameters": [
+        {
+            "name": "bigquery_table",
+            "label": "BigQuery Table",
+            "helpText": "The name of the BigQuery table to write the processed data"
+        },
+        {
+            "name": "bigquery_dataset",
+            "label": "BigQuery Dataset",
+            "helpText": "The name of the BigQuery dataset where the table resides"
+        },
+        {
+            "name": "input_subscription",
+            "label": "Pub/Sub Input Subscription",
+            "helpText": "The Pub/Sub subscription to receive messages from"
+        }
+    ]
+}
